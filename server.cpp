@@ -6,7 +6,6 @@
 #include <string.h>
 #include <algorithm>
 #include <vector>
-
 //#pragma comment(lib,"ws2_32.lib")   //添加ws2库
 //#include <iostream>
 //using namespace std;
@@ -15,6 +14,7 @@ enum CMD{
    CMD_LOGIN_RESULT,
    CMD_LOGOUT,
    CMD_LOGOUT_RESULT,
+   CMD_NEW_USER_JOIN,
    CMD_ERROR
 };
 struct DataHeader{
@@ -61,6 +61,16 @@ struct LogoutResult:public DataHeader
    }
    int result;
 };
+struct NewUserJoin:public DataHeader
+{
+   NewUserJoin()
+   {
+      dataLength = sizeof(NewUserJoin);
+      cmd = CMD_NEW_USER_JOIN;  
+      sock = 0;   
+   }
+   int sock;
+};
 std::vector<SOCKET> g_clients;
 int processor(SOCKET _cliSock)
 {
@@ -71,7 +81,7 @@ int processor(SOCKET _cliSock)
       DataHeader* header = (DataHeader* )szRecv;
       if(nLen <= 0)
       {
-         printf("客户端已退出，任务结束\n");
+         printf("客户端<%d>已退出，任务结束\n",_cliSock);
          return -1;
       }
       if(nLen >= sizeof(DataHeader))
@@ -166,7 +176,8 @@ int main()
       }
       //nfds 是一个证书值 是指fd_set集合中所有描述符（socket）的范围，而不是数量
       //既是所有文件描述符最大值+1在windows种这个参数可以写0
-      int ret = select(_sock+1,&fdRead,&fdWrite,&fdExp,NULL);
+      timeval t = {1,0};
+      int ret = select(_sock+1,&fdRead,&fdWrite,&fdExp,&t);          //非阻塞&t
       if(ret < 0)
       {
          printf("select任务结束。\n");
@@ -185,7 +196,11 @@ int main()
          {
             printf("错误，接受到无效客户端SOCKET。。。\n");
          }
-
+         for(int n = (int)g_clients.size()-1; n >= 0;n--)
+         {
+            NewUserJoin userJoin;
+            send(g_clients[n],(const char* )&userJoin,sizeof(NewUserJoin),0);
+         }
          g_clients.push_back(_cliSock);
          printf("新客户端加入：socket= %d ,IP ：%s \n",_cliSock,inet_ntoa(clientAddr.sin_addr));
          
@@ -202,7 +217,7 @@ int main()
          }
       }
       
-    
+      printf("空闲时间处理其他事务。。\n");
    }
 
    for(int n = (int)g_clients.size()-1; n >= 0;n--)
