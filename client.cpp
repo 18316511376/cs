@@ -3,8 +3,7 @@
 #include <windows.h>
 #include <stdio.h>
 #include <iostream>
-//#include <stdlib.h>
-//#include <pthread.h>
+#include <thread>
 enum CMD{
    CMD_LOGIN,
    CMD_LOGIN_RESULT,
@@ -71,7 +70,7 @@ struct NewUserJoin:public DataHeader
 int processor(SOCKET _cliSock)
 {
      //字符缓冲区
-      char szRecv[10240] = {};
+      char szRecv[1024] = {};
       // 5 接收客户端数据 
        int nLen = recv(_cliSock,szRecv,sizeof(DataHeader),0);
       DataHeader* header = (DataHeader* )szRecv;
@@ -117,6 +116,39 @@ int processor(SOCKET _cliSock)
       return 0;
 }
 
+bool g_bRun = true;
+void cmdThread(SOCKET _sock)
+{
+   while(true)
+   {
+      char cmdBuf[256] = {};
+      scanf("%s",cmdBuf);
+      if(0 == strcmp(cmdBuf,"exit"))
+      {
+         g_bRun = false;
+         printf("退出cmdThread线程\n");
+         break;
+      }
+      else if(0 == strcmp(cmdBuf,"login"))
+      {
+         Login login;
+         strcpy(login.userName,"jjmj");
+         strcpy(login.PassWord,"jjmj");
+         send(_sock,(const char* )&login,sizeof(Login),0);
+      }
+      else if(0 == strcmp(cmdBuf,"logout"))
+      {
+         Logout logout;
+         strcpy(logout.userName,"jjmj");
+         send(_sock,(const char* )&logout,sizeof(Logout),0);
+      }
+      else
+      {
+         printf("不支持命令\n");
+      }
+   }
+      
+}
 int main()
 {
     WORD ver = MAKEWORD(2,2);
@@ -144,13 +176,15 @@ int main()
     int ret = connect(_sock,(sockaddr*)&_sin,sizeof(sockaddr_in));
     if(INVALID_SOCKET == ret)
     {
-        printf("错误，建立Socket失败...\n");
+        printf("错误，连接服务器失败...\n");
     }
     else
     {
-        printf("成功，建立Socket成功...\n");
+        printf("成功，连接服务器成功...\n");
     }
-    while(true)
+    std::thread t1(cmdThread,_sock);
+    t1.detach();
+    while(g_bRun)
     {
       fd_set fdReads;
       FD_ZERO(&fdReads);
@@ -174,12 +208,8 @@ int main()
          }
       }
       
-      printf("空闲时间处理其他事务。。\n");
-      Login login;
-      strcpy(login.userName,"jjmj");
-      strcpy(login.PassWord,"jjmj");
-      send(_sock,(const char* )&login,sizeof(login),0);
-      Sleep(1000);
+      //printf("空闲时间处理其他事务。。\n");
+
 
    }
 

@@ -75,7 +75,7 @@ std::vector<SOCKET> g_clients;
 int processor(SOCKET _cliSock)
 {
      //字符缓冲区
-      char szRecv[10240] = {};
+      char szRecv[1024] = {};
       // 5 接收客户端数据 
        int nLen = recv(_cliSock,szRecv,sizeof(DataHeader),0);
       DataHeader* header = (DataHeader* )szRecv;
@@ -217,7 +217,7 @@ int main()
          }
       }
       
-      printf("空闲时间处理其他事务。。\n");
+      //printf("空闲时间处理其他事务。。\n");
    }
 
    for(int n = (int)g_clients.size()-1; n >= 0;n--)
