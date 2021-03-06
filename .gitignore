@@ -1,0 +1,6 @@
+networkdatamessage.md
+server.exe
+client.exe
+.vscode
+EasyTcpClient/bin
+EasyTcpServer/bin
