@@ -38,7 +38,7 @@ int main()
  
    EasyTcpClient client;
    client.InitSocket();
-   client.Connect("8.129.238.250",4567);
+   client.Connect("127.0.0.1",4567);
 
    //启动线程
    std::thread t1(cmdThread,&client);
