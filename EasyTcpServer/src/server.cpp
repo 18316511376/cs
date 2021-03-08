@@ -1,4 +1,5 @@
 #include "EasyTcpServer.hpp"
+<<<<<<< HEAD
 #include <thread>
 
 bool g_bRun = true;
@@ -21,6 +22,9 @@ void cmdThread()
    }
       
 }
+=======
+
+>>>>>>> 18facd1fd6e1be9798ad6108f2e8cfc04c7f9f3a
 int main()
 {
  
@@ -29,11 +33,17 @@ int main()
    server.SocketBind(nullptr,4567);
    server.SocketListen(5);
 
+<<<<<<< HEAD
    std::thread t1(cmdThread);
    t1.detach();
 
    
    while(g_bRun)
+=======
+
+   
+   while(server.isRun())
+>>>>>>> 18facd1fd6e1be9798ad6108f2e8cfc04c7f9f3a
    {
       server.OnRun();
       
