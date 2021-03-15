@@ -95,10 +95,10 @@ int EasyTcpServer::Accept()
          else
          {
             
-            NewUserJoin userJoin;
-            SendDataAll(&userJoin);
+            //NewUserJoin userJoin;
+            //SendDataAll(&userJoin);
             g_clients.push_back(new ClientSocket(_cliSock));
-            std::cout<<"新客户端加入：socket= "<<_cliSock<<" ,IP:"<<inet_ntoa(clientAddr.sin_addr)<<std::endl;   
+            std::cout<<"socket=<"<<_sock<<">"<<"新客户端"<<g_clients.size()<<"加入：socket= <"<<_sock<<"> ,IP:"<<inet_ntoa(clientAddr.sin_addr)<<std::endl;   
          }
         return _cliSock;
 }
@@ -242,36 +242,45 @@ int EasyTcpServer::RecvData(ClientSocket* pClient)
 
 void EasyTcpServer::OnNetMsg(SOCKET _cliSock,DataHeader* header)
 {
-         // 6 处理请求
-        switch(header->cmd)
+    _recvCount++;
+    auto t1 = _tTime.getElapsedSecond();
+    if(t1 >= 1.0)
+    {
+        std::cout<<"time<"<<t1<<">,socket<"<<_sock<<">,clients<"<<g_clients.size()<<">,recvCount<"<<_recvCount<<">"<<std::endl;
+        _recvCount = 0;
+        _tTime.update();
+    }
+
+    // 6 处理请求
+    switch(header->cmd)
+    {
+        case CMD_LOGIN:
         {
-            case CMD_LOGIN:
-            {
-                Login* login = (Login* )header;
-                std::cout<<"收到命令：CMD_LOGIN 数据长度："<<login->dataLength<<" userName="<<login->userName<<" PassWord="<<login->PassWord<<std::endl;
-                //忽略判断用户密码是否正确的过程
-                LoginResult ret;
-                SendData(_cliSock,&ret);
-            }
-            break;
-            case CMD_LOGOUT:
-            {
-               
-                Logout* logout = (Logout* )header;
-                std::cout<<"收到命令：CMD_LOGOUT 数据长度："<<logout->dataLength<<" userName="<<logout->userName<<std::endl;
-                //忽略判断用户密码是否正确的过程
-                LogoutResult ret;
-                SendData(_cliSock,&ret);
-            }
-            break;
-            default:
-            {
-                std::cout<<"<socket = "<<_sock<<"> 收到未定义消息，数据长度："<<header->dataLength<<" userName="<<std::endl;
-            }
+            Login* login = (Login* )header;
+            //std::cout<<"收到命令：CMD_LOGIN 数据长度："<<login->dataLength<<" userName="<<login->userName<<" PassWord="<<login->PassWord<<std::endl;                //忽略判断用户密码是否正确的过程
+            //LoginResult ret;
+            //SendData(_cliSock,&ret);
+
+        }
+         break;
+        case CMD_LOGOUT:
+        {
+           
+            Logout* logout = (Logout* )header;
+            //std::cout<<"收到命令：CMD_LOGOUT 数据长度："<<logout->dataLength<<" userName="<<logout->userName<<std::endl;
+            //忽略判断用户密码是否正确的过程
+            //LogoutResult ret;
+            //SendData(_cliSock,&ret);
+        }
+        break;
+        default:
+        {
+            std::cout<<"<socket = "<<_sock<<"> 收到未定义消息，数据长度："<<header->dataLength<<" userName="<<std::endl;
+        }
                 //DataHeader ret = {0,CMD_ERROR};
                 //SendData(_cliSock,&ret);
-            break;
-        }
+        break;
+    }
 }
     //发送指定Socket数据
 int EasyTcpServer::SendData(SOCKET _cSock,DataHeader* header)

@@ -23,7 +23,7 @@ int EasyTcpClient::InitSocket()
         }
         else
         {
-            printf("成功，建立Socket成功...\n");
+            //printf("成功，建立Socket成功...\n");
         }
         
         return 1;
@@ -54,7 +54,7 @@ int EasyTcpClient::Connect(const char*ip,unsigned short port)
         }
         else
         {
-            printf("成功，连接服务器成功...\n");
+            //printf("成功，连接服务器成功...\n");
         }
 
         return ret;
