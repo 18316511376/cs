@@ -1,6 +1,177 @@
 #include "EasyTcpServer.hpp"
+bool CellServer::isRun()
+{
+        return _sock != INVALID_SOCKET;
+}
+void CellServer::Close()
+{
+        if(_sock == INVALID_SOCKET)
+            return ;
+#ifdef _WIN32      
+        //关闭套接字closesocket
+        for(int n = (int)g_clients.size()-1; n >= 0;n--)
+        {
+            closesocket(g_clients[n]->sockfd());
+            delete g_clients[n];
+        }
+        
+        closesocket(_sock);
+        //-----
+        WSACleanup();
+        printf("已退出，任务结束。");
+#else
+        for(int n = (int)g_clients.size - 1;n>=0;n--)
+        {
+            close(g_clients[n]->sockfd());
+            delete g_clients[n];
+        }
+        close(_sock);
+#endif
+        g_clients.clear();
+        _sock = INVALID_SOCKET;
+}
+void CellServer::addClients(ClientSocket* pClient)
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+    g_clientBuff.push_back(pClient);
+}
+void CellServer::Start()
+{
+    _thread = new std::thread(std::mem_fun(&CellServer::OnRun),this);
+}
+    //处理网络消息
+bool CellServer::OnRun()
+{
+        if(!isRun())
+            return false;
+        
+        if(g_clients.size() > 0 )          //添加到
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            for(auto pClient : g_clientBuff)
+            {
+                g_clients.push_back(pClient);
+            }
+            g_clientBuff.clear();           
+        }
+        fd_set fdRead;
+        fd_set fdWrite;
+        fd_set fdExp;
 
- char _szRecv[RECV_BUFF_SIZE] = {};
+        FD_ZERO(&fdRead);
+        FD_ZERO(&fdWrite);
+        FD_ZERO(&fdExp);
+
+        FD_SET(_sock,&fdRead);
+        FD_SET(_sock,&fdWrite);
+        FD_SET(_sock,&fdExp);
+
+
+        //nfds 是一个证书值 是指fd_set集合中所有描述符（socket）的范围，而不是数量
+        //既是所有文件描述符最大值+1在windows种这个参数可以写0
+        timeval t = {1,0};
+        int ret = select(_sock+1,&fdRead,&fdWrite,&fdExp,&t);          //非阻塞&t
+        if(ret < 0)
+        {
+            std::cout<<"select任务结束。。。"<<std::endl;
+            Close();
+            return false;
+        }
+        //判断描述符是否在集合中
+        if(FD_ISSET(_sock,&fdRead))
+        {
+            FD_CLR(_sock,&fdRead);
+            //Accept();
+            return true;
+        }
+
+
+        return true;
+}
+
+int CellServer::RecvData(ClientSocket* pClient)
+{
+
+        //  接收客户端数据 
+        int nLen = (int)recv(pClient->sockfd(),_szRecv,RECV_BUFF_SIZE,0);
+       // std::cout<<"nLen = "<<nLen<<std::endl;
+        if(nLen <= 0)
+        {
+            std::cout<<"客户端<"<<pClient->sockfd()<<">已退出，任务结束"<<std::endl;
+            return -1;
+        }
+
+        //将收取的数据拷贝到消息缓冲区
+        memcpy(pClient->msgBuf()+pClient->getLastPos(),_szRecv,nLen);
+        //消息缓冲区的数据尾部位置后移
+        pClient->setLastPos(pClient->getLastPos()+ nLen);
+        //判断后移的大小是否大于数据头
+        while(pClient->getLastPos() >= sizeof(DataHeader))
+        {
+            DataHeader* header = (DataHeader*)pClient->msgBuf();
+            //判断消息缓冲区的数据长度大于消息长度
+            if(pClient->getLastPos() >= header->dataLength)
+            {
+
+                //剩余未处理消息缓冲区数据的长度
+                int nSize = pClient->getLastPos()-header->dataLength;
+                //处理数据
+                OnNetMsg(pClient->sockfd(),header);
+
+                //将消息缓冲区剩余未处理的数据前移
+                memcpy(pClient->msgBuf(),pClient->msgBuf()+header->dataLength,nSize);
+                //消息缓冲的数据尾部位置前移
+                pClient->setLastPos(nSize);
+            }
+            else
+            {
+                //消息缓冲区剩余数据不够一条完整消息
+                break;
+            }
+        } 
+        return 0;
+}
+
+void CellServer::OnNetMsg(SOCKET _cliSock,DataHeader* header)
+{
+    // 6 处理请求
+    switch(header->cmd)
+    {
+        case CMD_LOGIN:
+        {
+            Login* login = (Login* )header;
+            //std::cout<<"收到命令：CMD_LOGIN 数据长度："<<login->dataLength<<" userName="<<login->userName<<" PassWord="<<login->PassWord<<std::endl;                //忽略判断用户密码是否正确的过程
+            //LoginResult ret;
+            //SendData(_cliSock,&ret);
+
+        }
+         break;
+        case CMD_LOGOUT:
+        {
+           
+            Logout* logout = (Logout* )header;
+            //std::cout<<"收到命令：CMD_LOGOUT 数据长度："<<logout->dataLength<<" userName="<<logout->userName<<std::endl;
+            //忽略判断用户密码是否正确的过程
+            //LogoutResult ret;
+            //SendData(_cliSock,&ret);
+        }
+        break;
+        default:
+        {
+            std::cout<<"<socket = "<<_sock<<"> 收到未定义消息，数据长度："<<header->dataLength<<" userName="<<std::endl;
+        }
+                //DataHeader ret = {0,CMD_ERROR};
+                //SendData(_cliSock,&ret);
+        break;
+    }
+}
+
+/**************************************************************************************************************************************/
+/*                                                                                                                                    */
+/*                                                          EasyTcpServer                                                             */
+/*                                                                                                                                    */
+/**************************************************************************************************************************************/
+char _szRecv[RECV_BUFF_SIZE] = {};
     //初始化socket
 SOCKET EasyTcpServer::InitSocket()
 {
@@ -76,7 +247,7 @@ SOCKET EasyTcpServer::SocketListen(int n)
 
         return ret;  
 }
-
+    //接收客户端连接
 int EasyTcpServer::Accept()
 {
         // accept 等待接收客户端
@@ -102,8 +273,17 @@ int EasyTcpServer::Accept()
          }
         return _cliSock;
 }
-    //接收客户端连接
-    
+
+void EasyTcpServer::Start()  
+{
+    for(int n = 0; n<_CellServer_THREAD_COUNT; n++)
+    {
+        auto ser = new CellServer(_sock);
+        _cellServers.push_back(ser);
+        ser->Start();
+    }
+}
+    //处理网络消息
 bool EasyTcpServer::OnRun()
 {
         if(!isRun())

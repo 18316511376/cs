@@ -2,7 +2,7 @@
 #define _EASYTCPSERVER_HPP_
 
 #ifdef _WIN32
-    #define FD_SETSIZE      1024
+    #define FD_SETSIZE 4096
     #define WIN32_LEAN_AND_MEAN
     #include <winsock2.h>
     #include <windows.h>
@@ -20,11 +20,15 @@
 #include <stdio.h>
 #include <iostream>
 #include <vector>
+#include <thread>
+#include <mutex>
 #include "CELLTimes.hpp"
 #include "MessageHeader.hpp"
-#define RECV_BUFF_SIZE  10240
 
+#define RECV_BUFF_SIZE  10240
+#define _CellServer_THREAD_COUNT    4
 extern char _szRecv[RECV_BUFF_SIZE];   //双缓冲区
+
 
 class ClientSocket
 {
@@ -65,12 +69,41 @@ public:
     }
 };
 
+class CellServer{
+
+public:
+    CellServer(SOCKET sock = INVALID_SOCKET)
+    {   
+        _sock = sock;
+    }
+    ~CellServer()
+    {
+        Close();
+        _sock = INVALID_SOCKET;
+    }
+    bool OnRun();
+    bool isRun();
+    void Close();
+    int RecvData(ClientSocket* pClient);
+    virtual void OnNetMsg(SOCKET _cliSock,DataHeader* header);
+    void addClients(ClientSocket* pClient);
+    void Start();
+private:
+    SOCKET _sock;
+    std::vector<ClientSocket* > g_clients; 
+    //缓冲队列  
+    std::vector<ClientSocket* > g_clientBuff;
+    std::mutex _mutex;
+    std::thread* _thread;
+};
+
 class EasyTcpServer
 {
 private:
     /* data */
     SOCKET _sock;
     std::vector<ClientSocket* > g_clients;
+    std::vector<CellServer* > _cellServers;
     CELLTimes _tTime;
     int _recvCount;
 
@@ -89,6 +122,8 @@ public:
     //监听套接字
     SOCKET SocketListen(int n);
     int Accept();
+
+    void Start();
     //接收客户端连接
     bool OnRun();
 
